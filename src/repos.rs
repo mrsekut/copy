@@ -18,6 +18,27 @@ pub fn get_default_user() -> io::Result<String> {
     }
 }
 
+pub fn get_default_branch(repo: &str) -> io::Result<String> {
+    let output = Command::new("gh")
+        .args(&[
+            "api",
+            &format!("repos/{}/branches", repo),
+            "-q",
+            ".[0].name",
+        ])
+        .output()?;
+    let branch = String::from_utf8_lossy(&output.stdout).trim().to_string();
+
+    if branch.is_empty() {
+        Err(io::Error::new(
+            io::ErrorKind::Other,
+            "Failed to get default branch",
+        ))
+    } else {
+        Ok(branch)
+    }
+}
+
 pub fn get_repo_list(default_user: &str) -> io::Result<String> {
     let graphql_query = formatdoc! {r#"
         query ($owner: String!, $endCursor: String) {{
