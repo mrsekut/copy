@@ -1,12 +1,14 @@
 use repo::{get_all_repo_files, parse_repo_tree};
 use repos::{get_default_branch, get_default_user, get_repo_list};
+use std::fs;
 use std::io::{self, Write};
+use std::path::Path;
 use std::process::{Command, Stdio};
 
 mod repo;
 mod repos;
 
-/// TODO: deps
+/// TODO: dependencies
 fn main() -> io::Result<()> {
     let user = get_default_user()?;
     let repo_list = get_repo_list(&user)?;
@@ -16,7 +18,7 @@ fn main() -> io::Result<()> {
     let contents = get_all_repo_files(&repo, &default_branch)?;
     let file_list = parse_repo_tree(&contents, &repo, &default_branch)?;
     if file_list.is_empty() {
-        eprintln!("選択されたリポジトリにファイルが見つかりませんでした。");
+        eprintln!("No files found in the selected repository.");
         return Ok(());
     }
 
@@ -29,7 +31,7 @@ fn main() -> io::Result<()> {
         .find(|(name, _)| name == &selected_file)
         .map(|(_, url)| url)
         .unwrap();
-    download_file(&download_url, &selected_file)?;
+    copy_file(&download_url, &selected_file)?;
 
     Ok(())
 }
@@ -47,18 +49,22 @@ fn select(input: &str) -> io::Result<String> {
     Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
 }
 
-fn download_file(download_url: &str, file_name: &str) -> io::Result<()> {
+fn copy_file(download_url: &str, file_name: &str) -> io::Result<()> {
+    if let Some(parent) = Path::new(file_name).parent() {
+        fs::create_dir_all(parent)?;
+    }
+
     let status = Command::new("curl")
         .args(&["-s", download_url, "-o", file_name])
         .status()?;
 
     if status.success() {
-        println!("ファイル {} のダウンロードに成功しました。", file_name);
+        println!("File {} copied successfully.", file_name);
         Ok(())
     } else {
         Err(io::Error::new(
             io::ErrorKind::Other,
-            "ファイルのダウンロードに失敗しました",
+            "Failed to download file",
         ))
     }
 }
