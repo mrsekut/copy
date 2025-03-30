@@ -15,7 +15,7 @@ struct TreeEntry {
 }
 
 pub fn get_all_repo_files(repo: &str, branch: &str) -> io::Result<String> {
-    let tree_api_path = format!("repos/{}/git/trees/{}?recursive=1", repo, branch);
+    let tree_api_path = format!("repos/{repo}/git/trees/{branch}?recursive=1");
     let output = Command::new("gh").args(&["api", &tree_api_path]).output()?;
     Ok(String::from_utf8_lossy(&output.stdout).to_string())
 }
@@ -28,16 +28,17 @@ pub fn parse_repo_tree(
 ) -> io::Result<Vec<(String, String)>> {
     let tree_resp: TreeResponse =
         serde_json::from_str(contents).map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
-    let mut file_list = Vec::new();
-    for entry in tree_resp.tree {
-        if entry.node_type == "blob" {
-            // Raw URL generation: https://raw.githubusercontent.com/{repo}/{branch}/{path}
+
+    Ok(tree_resp
+        .tree
+        .into_iter()
+        .filter(|entry| entry.node_type == "blob")
+        .map(|entry| {
             let raw_url = format!(
                 "https://raw.githubusercontent.com/{}/{}/{}",
                 repo, branch, entry.path
             );
-            file_list.push((entry.path, raw_url));
-        }
-    }
-    Ok(file_list)
+            (entry.path, raw_url)
+        })
+        .collect())
 }
